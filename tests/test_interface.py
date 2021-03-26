@@ -218,11 +218,6 @@ def test_productquery_days(api):
     request = api.query(PRODUCT_ASIN, offers=20, days=max_days)
     product = request[0]
 
-    # Check if any Dateframes are out of date range.
-    dataframes_dates = [set(df.index.tolist()) for key, df in product['data'].items() if key.startswith('df_')]
-    dataframes_dates = chain.from_iterable(dataframes_dates)
-    assert not any_date_out_of_range(dataframes_dates)
-
     # Check if other affected dict entries are out of date range/
     keepa_minutes = {
         'buy_box_seller_id_history': product['buyBoxSellerIdHistory'][0::2],

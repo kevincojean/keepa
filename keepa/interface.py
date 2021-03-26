@@ -777,9 +777,6 @@ class AsyncKeepa():
         # ASINs convert to comma joined string
         assert len(items) <= 100
 
-        if kwargs['days'] is not None:
-            assert kwargs['days'] > 0
-
         if product_code_is_asin:
             kwargs['asin'] = ','.join(items)
         else:
@@ -813,6 +810,8 @@ class AsyncKeepa():
 
         if kwargs['days'] is None:
             del kwargs['days']
+        else:
+            assert kwargs['days'] > 0
 
         if kwargs['stats'] is None:
             del kwargs['stats']
