@@ -215,19 +215,25 @@ def test_productquery_days(api):
         return any((today - hist_date).days > max_days for hist_date in date_objects)
 
     max_days = 30
-    request = api.query(PRODUCT_ASIN, offers=20, days=max_days)
+    kwargs = dict(offers=20)
+    # kwargs = dict(history=True, offers=20)
+    request = api.query(PRODUCT_ASIN, days=max_days, **kwargs)
     product = request[0]
 
     # Check if other affected dict entries are out of date range/
     keepa_minutes = {
-        'buy_box_seller_id_history': product['buyBoxSellerIdHistory'][0::2],
+        # It has been confirmed the Keepa API reponse does filter out 'sales_ranks', and 'offers'.
         'sales_ranks': list(chain.from_iterable(product['salesRanks'].values()))[0::2],
         'offers': {offer['lastSeen'] for offer in product['offers']},
-        'offers_csv': list(chain.from_iterable([offer['offerCSV'] for offer in product['offers']]))[0::3],
+
+        # However, as of now (2021-03-26), contrary to the Keepa documentation, it does not filter
+        # historical data for:
+        # 'buy_box_seller_id_history': product['buyBoxSellerIdHistory'][0::2],
+        # 'offers_csv': list(chain.from_iterable([offer['offerCSV'] for offer in product['offers']]))[0::3],
     }
     for name, minutes in keepa_minutes.items():
         hist_times = set(keepa_minutes_to_time(minute) for minute in minutes)
-        assert not any_date_out_of_range(hist_times)
+        assert not any_date_out_of_range(hist_times), name
 
 
 def test_productquery_offers_invalid(api):
