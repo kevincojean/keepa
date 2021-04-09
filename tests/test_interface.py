@@ -2,6 +2,7 @@ import warnings
 import datetime
 import os
 from itertools import chain
+from urllib import request
 
 import numpy as np
 import pandas as pd
@@ -29,6 +30,7 @@ if os.path.isfile(keyfile):
 else:
     # from travis-ci or appveyor
     TESTINGKEY = os.environ.get('KEEPAKEY')
+    TESTINGKEY = 'b0e0uqjq4o8sp9rsm1489cocufc32tbo6t7dk7jg9kg4pottsbgqk9an90kracce'
     WEAKTESTINGKEY = os.environ.get('WEAKKEEPAKEY')
 
 # harry potter book ISBN
@@ -64,6 +66,12 @@ def api():
     assert keepa_api.tokens_left
     assert keepa_api.time_to_refill >= 0
     return keepa_api
+
+
+def test_timeout(api):
+    from requests.exceptions import Timeout
+    with pytest.raises(Timeout):
+        keepa.Keepa(TESTINGKEY, timeout=0.05)
 
 
 def test_deals(api):

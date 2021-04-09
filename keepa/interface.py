@@ -337,6 +337,9 @@ class Keepa():
     accesskey : str
         64 character access key string.
 
+    time_out_global: int
+        number of seconds before http requests to Keepa will timeout and raise an
+
     Examples
     --------
     Create the api object
@@ -363,10 +366,11 @@ class Keepa():
     >>> print('\t as of: {:s}'.format(str(usedtimes[-1])))
     """
 
-    def __init__(self, accesskey):
+    def __init__(self, accesskey, timeout=None):
         self.accesskey = accesskey
         self.status = None
         self.tokens_left = 0
+        self.timeout = timeout
 
         # Store user's available tokens
         log.info('Connecting to keepa using key ending in %s', accesskey[-6:])
@@ -394,7 +398,9 @@ class Keepa():
 
     def update_status(self):
         """ Updates available tokens """
-        self.status = self._request('token', {'key': self.accesskey}, wait=False)
+        # Using 'None' as a value for timeout would result in the request *never* timing out.
+        kwargs_timeout = dict(timeout=self.timeout) if self.timeout is not None else dict()
+        self.status = self._request('token', {'key': self.accesskey}, wait=False, **kwargs_timeout)
 
     def wait_for_tokens(self):
         """Checks any remaining tokens and waits if none are available.  """
@@ -411,7 +417,7 @@ class Keepa():
               offers=None, update=None, to_datetime=True,
               rating=False, out_of_stock_as_nan=True, stock=False,
               product_code_is_asin=True, progress_bar=True, buybox=False,
-              wait=True, days=None, only_live_offers=None):
+              wait=True, days=None, only_live_offers=None, timeout=None):
         """ Performs a product query of a list, array, or single ASIN.
         Returns a list of product data with one entry for each
         product.
@@ -531,6 +537,12 @@ class Keepa():
             the specified range. This means the value of the field has
             not changed since that date and is still active.  Default
             ``None``
+
+        timeout : int, optional
+            Any positive integer value. If specified will terminate the
+            http requests after x seconds, the raise a requests.Timeout
+            exception.
+
 
         Returns
         -------
@@ -723,6 +735,7 @@ class Keepa():
                 wait=wait,
                 days=days,
                 only_live_offers=only_live_offers,
+                timeout=timeout,
             )
             idx += nrequest
             products.extend(response['products'])
@@ -732,7 +745,7 @@ class Keepa():
 
         return products
 
-    def _product_query(self, items, product_code_is_asin=True, **kwargs):
+    def _product_query(self, items, product_code_is_asin=True, timeout=None, **kwargs):
         """
         Sends query to keepa server and returns parsed JSON result.
 
@@ -838,7 +851,7 @@ class Keepa():
         # Query and replace csv with parsed data if history enabled
         wait = kwargs.get("wait")
         kwargs.pop("wait", None)
-        response = self._request('product', kwargs, wait=wait)
+        response = self._request('product', kwargs, wait=wait, timeout=timeout)
         if kwargs['history']:
             for product in response['products']:
                 if product['csv']:  # if data exists
@@ -854,7 +867,7 @@ class Keepa():
 
         return response
 
-    def best_sellers_query(self, category, rank_avg_range=0, domain='US', wait=True):
+    def best_sellers_query(self, category, rank_avg_range=0, domain='US', wait=True, timeout=None):
         """
         Retrieve an ASIN list of the most popular products based on
         sales in a specific category or product group.  See
@@ -897,6 +910,12 @@ class Keepa():
             Wait available token before doing effective query.
             Defaults to ``True``.
 
+        timeout : int, optional
+            Any positive integer value. If specified will terminate the
+            http requests after x seconds, the raise a requests.Timeout
+            exception.
+
+
         Returns
         -------
         best_sellers : list
@@ -909,13 +928,13 @@ class Keepa():
                    'category': category,
                    'range': rank_avg_range}
 
-        response = self._request('bestsellers', payload, wait=wait)
+        response = self._request('bestsellers', payload, wait=wait, timeout=timeout)
         if 'bestSellersList' in response:
             return response['bestSellersList']['asinList']
         else:  # pragma: no cover
             log.info('Best sellers search results not yet available')
 
-    def search_for_categories(self, searchterm, domain='US', wait=True):
+    def search_for_categories(self, searchterm, domain='US', wait=True, timeout=None):
         """
         Searches for categories from Amazon.
 
@@ -927,6 +946,11 @@ class Keepa():
         wait : bool, optional
             Wait available token before doing effective query.
             Defaults to ``True``.
+
+        timeout : int, optional
+            Any positive integer value. If specified will terminate the
+            http requests after x seconds, the raise a requests.Timeout
+            exception.
 
         Returns
         -------
@@ -950,7 +974,7 @@ class Keepa():
                    'type': 'category',
                    'term': searchterm}
 
-        response = self._request('search', payload, wait=wait)
+        response = self._request('search', payload, wait=wait, timeout=timeout)
         if response['categories'] == {}:  # pragma no cover
             raise Exception('Categories search results not yet available ' +
                             'or no search terms found.')
@@ -958,7 +982,7 @@ class Keepa():
             return response['categories']
 
     def category_lookup(self, category_id, domain='US',
-                        include_parents=0, wait=True):
+                        include_parents=0, wait=True, timeout=None):
         """
         Return root categories given a categoryId.
 
@@ -979,6 +1003,11 @@ class Keepa():
         wait : bool, optional
             Wait available token before doing effective query.
             Defaults to ``True``.
+
+        timeout : int, optional
+            Any positive integer value. If specified will terminate the
+            http requests after x seconds, the raise a requests.Timeout
+            exception.
 
         Returns
         -------
@@ -1001,7 +1030,7 @@ class Keepa():
                    'category': category_id,
                    'parents': include_parents}
 
-        response = self._request('category', payload, wait=wait)
+        response = self._request('category', payload, wait=wait, timeout=timeout)
         if response['categories'] == {}:  # pragma no cover
             raise Exception('Category lookup results not yet available or no' +
                             'match found.')
@@ -1009,7 +1038,7 @@ class Keepa():
             return response['categories']
 
     def seller_query(self, seller_id, domain='US', to_datetime=True, 
-                           storefront=False, update=None, wait=True):
+                           storefront=False, update=None, wait=True, timeout=None):
         """Receives seller information for a given seller id.  If a
         seller is not found no tokens will be consumed.
 
@@ -1065,6 +1094,11 @@ class Keepa():
             Wait available token before doing effective query.
             Defaults to ``True``.
 
+        timeout : int, optional
+            Any positive integer value. If specified will terminate the
+            http requests after x seconds, the raise a requests.Timeout
+            exception.
+
         Returns
         -------
         seller_info : dict
@@ -1095,10 +1129,10 @@ class Keepa():
         if update:
             payload["update"] = update
 
-        response = self._request('seller', payload, wait=wait)
+        response = self._request('seller', payload, wait=wait, timeout=timeout)
         return _parse_seller(response['sellers'], to_datetime)
 
-    def product_finder(self, product_parms, domain='US', wait=True):
+    def product_finder(self, product_parms, domain='US', wait=True, timeout=None):
         """Query the keepa product database to find products matching
         your criteria. Almost all product fields can be searched for
         and sorted by.
@@ -2120,6 +2154,11 @@ class Keepa():
         wait : bool, optional
             Wait available token before doing effective query, Defaults to ``True``.
 
+        timeout : int, optional
+            Any positive integer value. If specified will terminate the
+            http requests after x seconds, the raise a requests.Timeout
+            exception.
+
         Examples
         --------
         Query for all of Jim Butcher's books
@@ -2142,10 +2181,10 @@ class Keepa():
                    'domain': DCODES.index(domain),
                    'selection': json.dumps(product_parms)}
 
-        response = self._request('query', payload, wait=wait)
+        response = self._request('query', payload, wait=wait, timeout=timeout)
         return response['asinList']
 
-    def deals(self, deal_parms, domain='US', wait=True):
+    def deals(self, deal_parms, domain='US', wait=True, timeout=None):
         """Query the Keepa API for product deals.
 
         You can find products that recently changed and match your
@@ -2191,6 +2230,11 @@ class Keepa():
         wait : bool, optional
             Wait available token before doing effective query, Defaults to ``True``.
 
+        timeout : int, optional
+            Any positive integer value. If specified will terminate the
+            http requests after x seconds, the raise a requests.Timeout
+            exception.
+
         Examples
         --------
         >>> import keepa
@@ -2217,10 +2261,10 @@ class Keepa():
                    'domain': DCODES.index(domain),
                    'selection': json.dumps(deal_parms)}
 
-        response = self._request('query', payload, wait=wait)
+        response = self._request('query', payload, wait=wait, timeout=timeout)
         return response['asinList']
 
-    def _request(self, request_type, payload, wait=True):
+    def _request(self, request_type, payload, wait=True, timeout=None):
         """Queries keepa api server.  Parses raw response from keepa
         into a json format.  Handles errors and waits for available
         tokens if allowed.
@@ -2229,8 +2273,9 @@ class Keepa():
             self.wait_for_tokens()
 
         while True:
+            request_kwargs = dict(timeout=timeout) if timeout is not None else dict()
             raw = requests.get('https://api.keepa.com/%s/?' %
-                               request_type, payload)
+                               request_type, payload, **request_kwargs)
             status_code = str(raw.status_code)
             if status_code != '200':
                 if status_code in SCODES:
